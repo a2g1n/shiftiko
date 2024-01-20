@@ -1,0 +1,197 @@
+---
+title: Growth_and_phenotypic_assays
+format: html
+editor: visual
+bibliography:
+  - grateful-refs.bib
+---
+
+Loading required packages
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+library("ggplot2")
+library("Rmisc")
+library("rstatix")
+library("ggpubr")
+library("dplyr")
+library("grateful")
+```
+
+## Growth assays
+
+### Faceted growth profiles of several genes [[Supplementary Figure 5]]
+
+```{r}
+# to plot parasitaemia measured by flow cytometry
+
+growthassay <-read.csv(file="./rawdata/growthassays_v200124.csv",header = T)
+summ.growthassay <- summarySE(growthassay, measurevar="Parasitaemia", groupvars=c("Line","Treatment","Erythrocytic.cycle.number"), na.rm=TRUE)
+pd<-position_dodge(0.1)
+colorPalette<-c("gray20","red3")
+pgrowth<-ggplot(summ.growthassay, aes(x=Erythrocytic.cycle.number, y=Parasitaemia, group=interaction(Line, Treatment))) +
+geom_ribbon(aes(ymin=Parasitaemia-se, ymax=Parasitaemia+se, fill=Treatment),alpha=0.3,position=pd) +
+geom_line(position=pd,alpha=0.75,aes(color=Treatment)) +
+scale_fill_manual(values=colorPalette) +
+scale_color_manual(values=colorPalette) +
+theme(axis.title.x = element_text(size=10,color="gray20"),axis.title.y = element_text(size=10,color="gray20"),
+  legend.title=element_blank(),
+  legend.background=element_blank(), legend.position=c(0.95,0.1),
+  legend.key = element_blank(), legend.key.width = unit(0.5,"cm"),
+  axis.text=element_text(size=10,color="gray20"),
+  axis.line = element_line(colour = "gray20"),
+  axis.ticks.y = element_blank(),
+  axis.ticks.x = element_line(colour = "gray20"),
+  #strip.background =element_rect(fill="gray50"),
+  strip.background =element_blank(),
+  strip.text = element_text(colour ="gray20",hjust=0),
+  panel.grid=element_blank(), 
+  panel.background=element_blank()) +
+xlab("Erythrocytic cycle number") +
+ylab("Parasitaemia (%)") +
+scale_y_log10(breaks = c(0.01,0.1,1,10), labels = c(0.01,0.1,1,10)) + 
+annotation_logticks(sides = "l",color="gray50",outside=T,size=0.25,
+                      long = unit(0.15, "cm"),mid = unit(0.1, "cm"),short = unit(0.05, "cm")) + # to get logticks
+coord_cartesian(ylim=c(1e-2,NA),clip = "off") + # to get logticks on the outside
+facet_wrap(~factor(Line, c("rom1","rom3","rom4","rom8","rom9","rom10","piplc","sub1","p230p")),nrow=4) # to facet by each gene
+pgrowth
+ggsave("./outplots/pgrowth.pdf",width = 5,height = 5)
+write.csv(summ.growthassay,file="./outdata/summ.growthassay.csv")
+```
+
+### For sub1 [[Figure 2]]
+
+```{r}
+# to plot parasitaemia measured by flow cytometry
+
+pd<-position_dodge(0.1)
+colorPalette<-c("gray20","red3")
+pgrowth_sub1<-ggplot(summ.growthassay %>% filter(Line == "sub1"), aes(x=Erythrocytic.cycle.number, y=Parasitaemia, group=interaction(Line, Treatment))) +
+geom_ribbon(aes(ymin=Parasitaemia-se, ymax=Parasitaemia+se, fill=Treatment),alpha=0.3,position=pd) +
+geom_line(position=pd,alpha=0.75,aes(color=Treatment)) +
+scale_fill_manual(values=colorPalette) +
+scale_color_manual(values=colorPalette) +
+theme(axis.title.x = element_text(size=10,color="gray20"),axis.title.y = element_text(size=10,color="gray20"),
+legend.title=element_blank(),
+legend.background=element_blank(), legend.position=c(0.95,0.1),
+legend.key = element_blank(), legend.key.width = unit(0.5,"cm"),
+axis.text=element_text(size=10,color="gray20"),
+axis.line = element_line(colour = "gray20"),
+axis.ticks.y = element_blank(),
+axis.ticks.x = element_line(colour = "gray20"),
+#strip.background =element_rect(fill="gray50"),
+strip.background =element_blank(),
+strip.text = element_text(colour ="gray20",hjust=0),
+panel.grid=element_blank(), 
+panel.background=element_blank()) +
+xlab("Erythrocytic cycle number") +
+ylab("Parasitaemia (%)") +
+scale_y_log10(breaks = c(0.01,0.1,1,10), labels = c(0.01,0.1,1,10)) + 
+  annotation_logticks(sides = "l",color="gray50",outside=T,size=0.25,
+                      long = unit(0.15, "cm"),mid = unit(0.1, "cm"),short = unit(0.05, "cm")) + # to get logticks
+  coord_cartesian(ylim=c(1e-2,NA),clip = "off") #+ # to get logticks on the outside
+#facet_wrap(~factor(Line, c("rom1","rom3","rom4","rom8","rom9","rom10","piplc","sub1","p230p")),nrow=4)
+pgrowth_sub1
+ggsave("./outplots/pgrowth_sub1.pdf",width = 5,height = 5)
+```
+
+## Number of merozoites in schizonts [[Figure 3]]
+
+Counted from IFA images of RAP and mock treated *rom8-shiftiko* line
+
+```{r}
+rom8.merozoites<-read.csv("./rawdata/rom8_merozoites_v200124.csv")
+
+pmerozoites_rom8<- ggplot(rom8.merozoites,
+       aes(x=factor(Treatment),y=MerozoiteNo)) +
+  geom_dotplot(aes(fill = Treatment),   # Use fill = Species here not in ggplot()
+                 binaxis = "y",         # which axis to bin along
+                 binwidth = 0.5,        # Minimal difference considered different
+                 stackdir = "center",    # Centered
+                 dotsize = 2,
+                 color=NA
+               ) +
+stat_summary(fun = median, fun.min = median, fun.max = median,
+                 geom = "crossbar", width = 0.25, colour = "gray20") +
+  theme_bw() +
+  scale_fill_manual(values = c("#BBBBBB","#CC3311")) +
+  theme(axis.title = element_text(size=10,color="gray20"),
+        axis.text=element_text(color="gray20"),
+        axis.line = element_line(colour = "gray20"),
+        panel.grid=element_blank(), 
+        panel.background=element_blank(), 
+        legend.position = "none") +
+  xlab("Treatment") +
+  ylab("Merozoite Number")
+
+pwc <- rom8.merozoites %>%
+  t_test(MerozoiteNo ~Treatment, p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "Treatment", fun = "mean_sd", dodge = 0.8)
+
+pmerozoites_rom8<- pmerozoites_rom8 + stat_pvalue_manual(
+    pwc, label = "p", tip.length = 0.01,
+    bracket.nudge.y = 5
+    ) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.1)))
+
+#plotly does not work with geom_dotplot
+pmerozoites_rom8
+ggsave("./outplots/pmerozoites_rom8.pdf",width= 4, height= 4)
+```
+
+## Invasion assay [[Figure 3]]
+
+4 hour invasion assays of RAP and mock treated *rom4-shiftiko* line under static and shaking conditions
+
+```{r}
+rom4.invasion <- read.csv("./rawdata/rom4_invasionassay_v200124.csv")
+
+rom4.invasion.FC<-spread(rom4.invasion,Timepoint,Parasitaemia,fill=0) %>% transmute(Line,Treatment,Condition,Replicate,FoldChange=AFTER/BFOR)
+
+pinvasion_rom4<-ggplot(rom4.invasion.FC,
+       aes(x=factor(Treatment),y=FoldChange)) +
+  geom_dotplot(aes(fill = Treatment),   # Use fill = Species here not in ggplot()
+                 binaxis = "y",         # which axis to bin along
+                 binwidth = 0.5,        # Minimal difference considered different
+                 stackdir = "center",    # Centered
+                 dotsize = 1,
+                 color=NA
+               ) +
+stat_summary(fun = median, 
+             fun.min = median, 
+             fun.max = median,
+             geom = "crossbar", 
+             width = 0.25,
+             colour = "gray20") +
+  facet_grid(.~Condition,labeller=labeller(Condition=c(SHAK="SHAKING",STAT="STATIC"))) +
+  theme_bw() +
+  theme(axis.title = element_text(size=10,color="gray20"),
+        axis.text=element_text(color="gray20"),
+        axis.line = element_line(colour = "gray20"),
+        panel.grid=element_blank(), 
+        panel.background=element_blank(), 
+        legend.position = "none") +
+  scale_fill_manual(values = c("#BBBBBB","#CC3311")) +
+  xlab("Treatment") + 
+  ylab("Fold Change in Parasitaemia")
+
+pwc <- rom4.invasion.FC %>% group_by(Condition) %>%
+  t_test(FoldChange ~Treatment, p.adjust.method = "bonferroni") %>%
+  add_xy_position(x = "Treatment", fun = "mean_sd", dodge = 0.8)
+
+pinvasion_rom4 <- pinvasion_rom4 + stat_pvalue_manual(
+    pwc, label = "p", tip.length = 0.01,
+    bracket.nudge.y = 1
+    ) +
+  scale_y_continuous(expand = expansion(mult = c(0.1, 0.1)))
+#plotly does not work with geom_dotplot
+pinvasion_rom4
+ggsave("./outplots/pinvasion_rom4.pdf",width= 4, height= 4)
+```
+
+
+## Citations
+
+```{r}
+cite_packages(output="paragraph",out.dir = getwd())
+```
