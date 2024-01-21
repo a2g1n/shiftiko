@@ -20,7 +20,9 @@ library("grateful")
 
 ## Growth assays
 
-### Faceted growth profiles of several genes [[Supplementary Figure 5]]
+### Faceted growth profiles of several genes
+
+\[\[Supplementary Figure 5\]\]
 
 ```{r}
 # to plot parasitaemia measured by flow cytometry
@@ -59,7 +61,7 @@ ggsave("./outplots/pgrowth.pdf",width = 5,height = 5)
 write.csv(summ.growthassay,file="./outdata/summ.growthassay.csv")
 ```
 
-### For sub1 [[Figure 2]]
+### For sub1 \[Figure 2\]
 
 ```{r}
 # to plot parasitaemia measured by flow cytometry
@@ -95,7 +97,7 @@ pgrowth_sub1
 ggsave("./outplots/pgrowth_sub1.pdf",width = 5,height = 5)
 ```
 
-## Number of merozoites in schizonts [[Figure 3]]
+## Number of merozoites in schizonts \[Figure 3\]
 
 Counted from IFA images of RAP and mock treated *rom8-shiftiko* line
 
@@ -139,7 +141,7 @@ pmerozoites_rom8
 ggsave("./outplots/pmerozoites_rom8.pdf",width= 4, height= 4)
 ```
 
-## Invasion assay [[Figure 3]]
+## Invasion assay \[Figure 3\]
 
 4 hour invasion assays of RAP and mock treated *rom4-shiftiko* line under static and shaking conditions
 
@@ -188,7 +190,6 @@ pinvasion_rom4 <- pinvasion_rom4 + stat_pvalue_manual(
 pinvasion_rom4
 ggsave("./outplots/pinvasion_rom4.pdf",width= 4, height= 4)
 ```
-
 
 ## Citations
 
