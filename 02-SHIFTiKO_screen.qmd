@@ -1,0 +1,303 @@
+---
+title: SHIFTiKO screen
+format: html
+editor: visual
+bibliography:
+  - grateful-refs.bib
+tags:
+  - shiftiko
+  - Rnotebook
+---
+
+# Analysis associated with SHIFTiKO preprint ([link](https://www.biorxiv.org/content/10.1101/2024.01.14.575607v1))
+
+Loading required packages
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+# Load necessary libraries for plotting and data manipulation
+
+library("ggplot2")
+library("ggrepel")
+library("Rmisc")
+library("rstatix")
+library("ggpubr")
+library("tidyr")
+library("tidytext")
+library("dplyr")
+library("gggenes")
+library("grateful")
+```
+
+## plotting floxing strategies
+
+Figure 3A
+
+```{r}
+# Load gene data from a CSV file into 'gene' dataframe
+gene <- read.csv("./rawdata/rom_gene_v200124.csv")
+# Load CDS (coding sequences) data from a CSV file into 'CDS' dataframe
+CDS <- read.csv("./rawdata/rom_cds_v200124.csv")
+# Filter out specific subnames from the CDS dataframe
+CDS <- CDS %>% filter(!subname %in% c("barR","barD","loxP"))
+
+# Create a plot of genes using ggplot2
+pgenes <- ggplot(gene, aes(xmin = start, xmax = end, y = name)) +
+  # Organize genes into separate panels, allowing y-axis to scale freely in each and arranging panels in a single column
+  facet_wrap(~ name, scale = "free_y", ncol = 1) +
+  # Add arrows to represent subgenes; however, the related 'geom_gene_arrow' line is commented out and not used
+  geom_subgene_arrow(data = CDS,
+                     aes(xmin = start, xmax = end, y = name, 
+                         xsubmin = substart, xsubmax = subend, fill = subname, alpha = subname),
+                     color = NA, # No border color for arrows
+                     arrowhead_height = unit(3, "mm"), arrowhead_width = unit(1, "mm")) +
+  # Manual color scale for different subgene types
+  scale_fill_manual(breaks = c("LHR", "RHR", "RR", "loxP", "loxPINT", "HA", "CDS", "domain", "barD", "barR", "gRNA"),
+                    values= c("#B1B1B1", "#B1B1B1", "#F29100", "white", "#F29100", "#CD001A", "#B1B1B1", "#808080", "#6F6F6E", "#37A6DE", "#8CC63F")) +
+  # Manual alpha scale for different subgene types, controlling their transparency
+  scale_alpha_manual(breaks = c("LHR", "RHR", "RR", "loxP", "loxPINT", "HA", "CDS", "domain", "barD", "barR", "gRNA"),
+                     values= c(0.8, 0.8, 1, 0.8, 1, 1, 0.4, 0.5, 0.8, 0.8, 1)) +
+  # Apply custom theme for gene plots
+  theme_genes() +
+  # Customize theme: remove y-axis title and legend title
+  theme(axis.title.y = element_blank(), legend.title = element_blank())
+
+# Display the plot
+pgenes
+
+# Save the plot to a PDF file with specified dimensions
+ggsave("./outplots/pgenes.pdf", width = 6, height = 4)
+
+```
+
+## Barseq analysis
+
+```{r}
+# Load the barseq dataset from a CSV file
+barseq <- read.csv(file="./rawdata/barseq_v200124.csv", header = T)
+
+# Process the barseq dataset to get distinct combinations of Replicate, Timepoint, and Treatment
+barseq %>%
+  distinct(Replicate, Timepoint, Treatment) %>%
+  # Group by Timepoint and Treatment to organize data
+  group_by(Timepoint, Treatment) %>%
+  # Summarize data to count the number of replicates for each Timepoint and Treatment combination
+  summarize(Replicates = n()) %>%
+  # Ungroup to remove the grouping structure and return the data frame to a standard format
+  ungroup()
+
+```
+
+### Check for integration and excision for each gene at 24 h post-RAP treatment
+
+Figure 3D
+
+```{r}
+# Filter out specific sample due to anomalies, focusing on T0 timepoint and significant counts
+intexc <- barseq %>%
+  filter(!Sample == "T0RAP-2", # Exclude problematic sample
+         Timepoint == "T0", # Focus on T0 timepoint (T0sch for Supplementary Figure S4)
+         count >= 0.0001*(sum(count))) %>% # Include significant counts only
+  group_by(Sample,Timepoint,Treatment,Replicate) %>%
+  mutate(total = sum(count), # Calculate total counts per group
+         p = (count/total)) %>% # Calculate proportion of each count over total
+  group_by(Sample,Timepoint,Treatment,Replicate,Gene) %>%
+  mutate(bar.ratio = count/sum(count)) # Calculate gene-specific count ratio
+
+# Summarize data by key variables, calculate means and standard errors
+summ.intexc <- intexc %>%
+  group_by(Timepoint,Treatment,Gene,barcodetype) %>%
+  summarise(p.mean=mean(p), # Mean proportion
+            ratio.mean=mean(bar.ratio), # Mean ratio
+            n=n(), # Sample size
+            p.se=sd(p)/sqrt(n), # Standard error of proportion
+            ratio.se=sd(bar.ratio)/sqrt(n)) # Standard error of ratio
+
+# Prepare ratio mean for y-axis labels in the plot
+y_label <- summ.intexc %>%
+  filter(barcodetype=="boxit+") %>%
+  select(ratio.mean)
+
+# Create bar plot with error bars and text labels
+pbar_intexc <- ggplot(summ.intexc, aes(x=reorder(Gene, -p.mean),y=p.mean,fill=barcodetype)) +
+  geom_bar(stat="identity") + # Bar plot
+  geom_linerange(aes(x=reorder(Gene, -p.mean),ymin=p.mean-p.se, ymax=p.mean+p.se),
+                 alpha=0.8,size=.8,color="gray80") + # Error bars
+  geom_text(aes(label=paste(format(100*ratio.mean, digits = 1), "%"), vjust=2),
+            color="white") + # Percentage labels inside bars
+  scale_fill_manual(values=c("#9C9B9B","#35A8E0")) + # Manual color fill for bars
+  theme(axis.title.x = element_text(size=10), # X-axis title customization
+        axis.title.y = element_text(size=10), # Y-axis title customization
+        legend.title=element_blank(), # Remove legend title
+        legend.position = "none", # Remove legend
+        legend.background=element_blank(), # Remove legend background
+        legend.key=element_blank(), # Remove legend key background
+        legend.key.width = unit(1.25,"cm"), # Set legend key width
+        axis.text=element_text(size=10,color="gray20"), # Axis text customization
+        axis.text.x=element_text(angle=45,vjust=0.5), # X-axis text angle and vertical adjustment
+        axis.line = element_line(colour = "gray20"), # Axis line color
+        panel.grid=element_blank(), # Remove panel grid
+        panel.background=element_blank()) + # Remove panel background
+  xlab("Gene") + # X-axis label
+  ylab("Proportion") + # Y-axis label
+  facet_wrap(vars(Treatment),nrow=2) # Facet plot by Treatment with 2 rows
+
+# Display the plot
+pbar_intexc
+
+# Save the plot to a PDF file
+ggsave("./outplots/pbar_intexc.pdf", width = 6.5, height = 3.5)
+
+```
+
+### Profile the growth fitness of each mutant across four erythrocytic cycles
+
+Figure 3E
+
+```{r}
+
+```{r}
+# Filter data for specific conditions and calculate proportion of counts by sample
+bar.fitness <- barseq %>% 
+  filter(Treatment == "RAP+", barcodetype == "boxit+", Replicate == 1, 
+         Timepoint %in% c("T0","T1","T2","T3"), !Gene %in% c("gap45","gdpd","rom6","rom7")) %>%
+  group_by(Sample) %>%
+  mutate(total = sum(count), p = count / total)
+
+# Filter data for the start timepoint (T0)
+start = bar.fitness %>% filter(Timepoint == "T0")
+
+# Join filtered data with start data and calculate ratio
+from_start = bar.fitness %>% inner_join(start, by = c("Gene")) %>% 
+  mutate(ratio = p.x / p.y)
+
+# Filter data for control gene
+controlgene = from_start %>% filter(Gene == "p230p")
+
+# Join data with control gene data by timepoint and calculate ratio
+from_start_by_p230p = from_start %>% inner_join(controlgene, by = c("Timepoint.x"))
+
+# Calculate ratio, variance of ratio, and confidence interval; label final timepoint genes
+from_start_by_p230p = from_start_by_p230p %>% 
+  mutate(ratio2 = ratio.x / ratio.y, 
+         var_ratio2 = ((ratio.x^2 * ratio.y * (1 - ratio.y) / total.y.y) + 
+                       (ratio.y^2 * ratio.x * (1 - ratio.x) / total.x.y)) / (ratio.y^2)^2,
+         ratio2_low = ratio2 - 2 * sqrt(var_ratio2), 
+         ratio2_high = ratio2 + 2 * sqrt(var_ratio2), 
+         label = ifelse(Timepoint.x == "T3", Gene.x, NA))
+
+# Determine essentiality based on fitness ratio at final timepoint
+essentiality <- from_start_by_p230p %>%
+  mutate(essentiality = ifelse(ratio2 < 0.5, "#CC1236", "#35A8E0")) %>%
+  filter(Timepoint.x == "T3") %>%
+  select(Gene.x, essentiality) %>%
+  tibble::deframe()
+
+# Set position dodge for plot elements to avoid overlap
+pd <- position_dodge(0.1)
+
+# Function to calculate log scale breaks
+breaks_log10 <- function(x) {
+  low <- floor(log10(min(x)))
+  high <- ceiling(log10(max(x)))
+  10^(seq.int(low, high))
+}
+
+# Create the fitness plot
+pfitness <- ggplot(from_start_by_p230p, aes(x = Timepoint.x, y = ratio2, group = Gene.x)) +
+  geom_line(position = pd, alpha = 0.75, aes(color = Gene.x)) + # Draw lines for each gene
+  geom_ribbon(aes(ymin = pmax(1e-9, ratio2_low), ymax = ratio2_high, fill = Gene.x), 
+              position = pd, alpha = 0.3) + # Add shaded area for confidence interval
+  scale_color_manual(values = essentiality) + # Set line colors based on essentiality
+  scale_fill_manual(values = essentiality) + # Set fill colors based on essentiality
+  theme(axis.title.x = element_text(size = 10), # X-axis title customization
+        axis.title.y = element_text(size = 10), # Y-axis title customization
+        axis.ticks.y = element_blank(), # Hide y-axis ticks
+        axis.ticks.x = element_line(colour = "gray20"), # Customize x-axis ticks
+        legend.position = "none", # Hide legend
+        axis.text = element_text(size = 10, color = "gray20"), # Customize axis text
+        axis.line = element_line(colour = "gray20"), # Customize axis lines
+        panel.grid = element_blank(), # Remove grid lines
+        panel.background = element_blank()) + # Transparent background
+  xlab("Cycle") + # X-axis label
+  ylab("Relative fitness") + # Y-axis label
+  scale_y_log10(breaks = breaks_log10) + # Log scale for y-axis
+  annotation_logticks(sides = "l", color = "gray50", outside = TRUE, size = 0.5,
+                      long = unit(0.3, "cm"), mid = unit(0.2, "cm"), short = unit(0.1, "cm")) + # Add log ticks
+  coord_cartesian(ylim = c(0.5e-2, NA), clip = "off") + # Adjust y-axis limits and disable clipping
+  geom_label_repel(aes(label = label), color = "gray20", nudge_x = 0.2, na.rm = TRUE,
+                   label.size = NA, fill = NA, direction = "y") # Add labels with repulsion for clarity
+pfitness # Display the plot
+
+# Save the plot to a PDF file
+ggsave("./outplots/pfitness_binom.pdf", width = 5, height = 4)
+
+```
+
+### Assess mutant phenotypes within the erythrocytic cycle by scoring the fitness of each mutant at four within-cycle timepoints
+
+Figure 3F
+
+```{r}
+# Filter dataset for specified conditions and calculate proportion (p) of counts by gene and replicate
+bar.phenotyping <- barseq %>%
+  filter(Treatment == "RAP+", barcodetype == "boxit+", !Gene %in% c("gap45","gdpd","rom6","rom7"), Timepoint %in% c("T0","T0sz","T0nsz","T1","T1sz")) %>%
+  group_by(Replicate, Gene) %>%
+  mutate(total = sum(count), p = count / total) %>% # Calculate total counts and proportion for each gene and replicate
+  group_by(Replicate, Gene) %>%
+  mutate(SD.FC = p[Timepoint == "T0sz"] / p[Timepoint == "T0"], # Calculate fold change for stress dependency
+         E.FC = p[Timepoint == "T0nsz"] / p[Timepoint == "T0sz"], # Calculate fold change for endurance
+         I.FC = p[Timepoint == "T1"] / p[Timepoint == "T0sz"], # Calculate fold change for initiation
+         TD.FC = p[Timepoint == "T1sz"] / p[Timepoint == "T1"]) %>% # Calculate fold change for termination dependency
+  group_by(Replicate) %>%
+  mutate(SDscore = SD.FC / SD.FC[Gene == "p230p"], # Normalize scores by control gene p230p
+         Escore = E.FC / E.FC[Gene == "p230p"],
+         Iscore = I.FC / I.FC[Gene == "p230p"],
+         TDscore = TD.FC / TD.FC[Gene == "p230p"]) %>%
+  pivot_longer(cols = c(SDscore, Escore, Iscore, TDscore), names_to = "score") # Pivot data for scoring
+
+# Summarize phenotyping scores by gene and score type, calculating mean and standard error
+summ.phenotyping <- bar.phenotyping %>%
+  filter(Timepoint == "T0") %>%
+  group_by(Gene, score) %>%
+  summarise(score.mean = mean(value), n = n(), score.se = sd(value) / sqrt(n))
+
+# Create phenotyping plot excluding control gene, with genes reordered by mean score within each score type
+pphenotyping <- ggplot(summ.phenotyping %>% filter(!Gene %in% c("p230p")), aes(x = reorder_within(Gene, -score.mean, score), y = log2(score.mean))) +
+  geom_bar(stat = "identity", aes(fill = Gene)) + # Bar plot with genes colored by themselves
+  geom_linerange(aes(x = reorder_within(Gene, -score.mean, score), ymin = log2(score.mean - score.se), ymax = log2(score.mean + score.se), color = Gene), alpha = 0.5, size = .8) + # Error bars for each gene
+  scale_fill_manual(values = essentiality) + # Set custom colors for bars
+  scale_color_manual(values = essentiality) + # Set custom colors for error bars
+  theme(axis.title.x = element_text(size = 10, color = "gray20"), # Customize X-axis title
+        axis.title.y = element_text(size = 10, color = "gray20"), # Customize Y-axis title
+        legend.position = "none", # Remove legend
+        legend.background = element_blank(), # Remove legend background
+        legend.key = element_blank(), # Remove legend key background
+        legend.key.width = unit(1.25, "cm"), # Set width of legend keys
+        axis.text = element_text(size = 10, color = "gray20"), # Customize axis text
+        axis.text.x = element_text(angle = 45, vjust = 0.5), # Tilt X-axis text for readability
+        axis.ticks = element_line(colour = "gray20"), # Customize axis ticks
+        axis.line = element_line(colour = "gray20"), # Customize axis line color
+        strip.background = element_blank(), # Remove background from facet labels
+        strip.text = element_text(colour = "gray20", hjust = 0), # Customize facet label text
+        panel.grid = element_blank(), # Remove gridlines
+        panel.background = element_blank()) + # Remove panel background
+  xlab(" ") + # Remove X-axis label
+  ylab("Relative fold change") + # Y-axis label for fold change
+  facet_wrap(~factor(score, c("SDscore", "Escore", "Iscore", "TDscore")), nrow = 2, scales = "free") + # Facet plot by score type
+  scale_x_reordered() # Use reordered scale for X-axis
+pphenotyping # Display the plot
+
+# Save the plot to a PDF file
+ggsave("./outplots/pphenotyping.pdf", width = 6.5, height = 3.5)
+
+# Write the summary data to a CSV file
+write.csv(summ.phenotyping, file="./outdata/summ.phenotyping.csv")
+```
+
+## Citations
+
+```{r}
+cite_packages(output="paragraph",out.dir = getwd())
+```
+Inline comments added using ChatGPT-4.
