@@ -244,10 +244,10 @@ bar.phenotyping <- barseq %>%
   group_by(Replicate, Gene) %>%
   mutate(total = sum(count), p = count / total) %>% # Calculate total counts and proportion for each gene and replicate
   group_by(Replicate, Gene) %>%
-  mutate(SD.FC = p[Timepoint == "T0sz"] / p[Timepoint == "T0"], # Calculate fold change for stress dependency
-         E.FC = p[Timepoint == "T0nsz"] / p[Timepoint == "T0sz"], # Calculate fold change for endurance
-         I.FC = p[Timepoint == "T1"] / p[Timepoint == "T0sz"], # Calculate fold change for initiation
-         TD.FC = p[Timepoint == "T1sz"] / p[Timepoint == "T1"]) %>% # Calculate fold change for termination dependency
+  mutate(SD.FC = p[Timepoint == "T0sz"] / p[Timepoint == "T0"], # Calculate fold change across schizont development
+         E.FC = p[Timepoint == "T0nsz"] / p[Timepoint == "T0sz"], # Calculate fold change across egress (schizonts vs unegressed schizonts)
+         I.FC = p[Timepoint == "T1"] / p[Timepoint == "T0sz"], # Calculate fold change across invasion (schizonts vs rings)
+         TD.FC = p[Timepoint == "T1sz"] / p[Timepoint == "T1"]) %>% # Calculate fold change across trophozoite development
   group_by(Replicate) %>%
   mutate(SDscore = SD.FC / SD.FC[Gene == "p230p"], # Normalize scores by control gene p230p
          Escore = E.FC / E.FC[Gene == "p230p"],
@@ -709,10 +709,10 @@ bar.phenotyping <- barseq %>%
   group_by(Replicate, Gene) %>%
   mutate(total = sum(count), p = count / total) %>% # Calculate total counts and proportion for each gene and replicate
   group_by(Replicate, Gene) %>%
-  mutate(SD.FC = p[Timepoint == "T0sz"] / p[Timepoint == "T0"], # Calculate fold change for stress dependency
-         E.FC = p[Timepoint == "T0nsz"] / p[Timepoint == "T0sz"], # Calculate fold change for endurance
-         I.FC = p[Timepoint == "T1"] / p[Timepoint == "T0sz"], # Calculate fold change for initiation
-         TD.FC = p[Timepoint == "T1sz"] / p[Timepoint == "T1"]) %>% # Calculate fold change for termination dependency
+  mutate(SD.FC = p[Timepoint == "T0sz"] / p[Timepoint == "T0"], # Calculate fold change across schizont development
+         E.FC = p[Timepoint == "T0nsz"] / p[Timepoint == "T0sz"], # Calculate fold change across egress (schizonts vs unegressed schizonts)
+         I.FC = p[Timepoint == "T1"] / p[Timepoint == "T0sz"], # Calculate fold change across invasion (schizonts vs rings)
+         TD.FC = p[Timepoint == "T1sz"] / p[Timepoint == "T1"]) %>% # Calculate fold change across trophozoite development
   group_by(Replicate) %>%
   mutate(SDscore = SD.FC / SD.FC[Gene == "p230p"], # Normalize scores by control gene p230p
          Escore = E.FC / E.FC[Gene == "p230p"],
